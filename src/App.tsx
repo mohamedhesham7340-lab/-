@@ -7,13 +7,11 @@ import {
   CurrencyCode 
 } from './types';
 import { 
-  loadProducts, 
-  saveProducts, 
-  loadQuotationMeta, 
-  saveQuotationMeta, 
   loadCart, 
-  saveCart 
+  saveCart
 } from './utils/storage';
+import { INITIAL_PRODUCTS, INITIAL_QUOTATION_META } from './data/initialData';
+import { fetchProducts, fetchMeta, saveProduct, saveMeta, deleteProduct } from './utils/api';
 import { Header } from './components/Header';
 import { ProductCatalog } from './components/ProductCatalog';
 import { ProductDetailModal } from './components/ProductDetailModal';
@@ -36,8 +34,8 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [products, setProductsState] = useState<ProductItem[]>(loadProducts);
-  const [meta, setMetaState] = useState<QuotationMeta>(loadQuotationMeta);
+  const [products, setProductsState] = useState<ProductItem[]>(INITIAL_PRODUCTS);
+  const [meta, setMetaState] = useState<QuotationMeta>(INITIAL_QUOTATION_META);
   const [cart, setCartState] = useState<CartItem[]>(loadCart);
 
   const [activeView, setActiveView] = useState<ActiveView>('catalog');
@@ -45,6 +43,31 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProductModal, setSelectedProductModal] = useState<ProductItem | null>(null);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+
+  const [isFetching, setIsFetching] = useState(true);
+
+  // Fetch initial data from DB
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [dbProducts, dbMeta] = await Promise.all([
+          fetchProducts(),
+          fetchMeta()
+        ]);
+        if (dbProducts && dbProducts.length > 0) {
+          setProductsState(dbProducts);
+        }
+        if (dbMeta) {
+          setMetaState(dbMeta);
+        }
+      } catch (err) {
+        console.error('Failed to fetch from DB:', err);
+      } finally {
+        setIsFetching(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // Exchange rates relative to USD
   const exchangeRates: Record<CurrencyCode, number> = {
@@ -54,16 +77,36 @@ export default function App() {
   };
   const currentRate = exchangeRates[currency];
 
-  // Auto-sync products to storage on change
-  const setProducts = (newProds: ProductItem[]) => {
+  // Auto-sync products to DB on change
+  const setProducts = async (newProds: ProductItem[]) => {
+    const deleted = products.filter(p => !newProds.find(n => n.id === p.id));
+    const modified = newProds.filter(n => {
+      const old = products.find(p => p.id === n.id);
+      return !old || JSON.stringify(old) !== JSON.stringify(n);
+    });
+
     setProductsState(newProds);
-    saveProducts(newProds);
+
+    try {
+      for (const p of deleted) {
+        await deleteProduct(p.id);
+      }
+      for (const p of modified) {
+        await saveProduct(p);
+      }
+    } catch (err) {
+      console.error('Failed to sync products to DB:', err);
+    }
   };
 
-  // Auto-sync meta to storage on change
-  const setMeta = (newMeta: QuotationMeta) => {
+  // Auto-sync meta to DB on change
+  const setMeta = async (newMeta: QuotationMeta) => {
     setMetaState(newMeta);
-    saveQuotationMeta(newMeta);
+    try {
+      await saveMeta(newMeta);
+    } catch (err) {
+      console.error('Failed to save meta to DB:', err);
+    }
   };
 
   // Auto-sync cart to storage on change
@@ -71,6 +114,14 @@ export default function App() {
     setCartState(newCart);
     saveCart(newCart);
   };
+
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#d4af37]"></div>
+      </div>
+    );
+  }
 
   // Cart operations
   const handleAddToCart = (
