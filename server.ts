@@ -62,6 +62,7 @@ async function startServer() {
   // Update Quotation Meta
   app.post("/api/meta", async (req, res) => {
     try {
+      console.log(`[API] Saving meta data...`);
       const meta = await db.select().from(quotationMeta).limit(1);
       if (meta.length > 0) {
         await db.update(quotationMeta).set({ data: req.body }).where(eq(quotationMeta.id, meta[0].id));
@@ -81,6 +82,7 @@ async function startServer() {
       const data = req.body;
       const id = data.id;
       
+      console.log(`[API] Saving product: ${id}`);
       const existing = await db.select().from(products).where(eq(products.id, id)).limit(1);
       
       if (existing.length > 0) {
