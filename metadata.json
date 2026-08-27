@@ -1,0 +1,6 @@
+{
+  "name": "Pharaoh Agri Exports - Quotation & Catalog",
+  "description": "منظومة كتالوج وعروض أسعار المنتجات الزراعية والأعشاب المجففة مع لوحة تحكم وتصدير PDF وواتساب",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
